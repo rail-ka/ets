@@ -1,0 +1,33 @@
+[package]
+name = "ets"
+version = "0.1.0"
+authors = ["Rail Khusnutdinov <rail@33.run>"]
+edition = "2021"
+resolver = "2"
+
+[[bin]]
+name = "ets"
+path = "src/main.rs"
+
+[dependencies]
+futures = "0.3"
+time = "0.3"
+tokio = { version = "1.29", features = [
+    "parking_lot",
+    "tracing",
+    "net",
+    "sync",
+    "fs",
+    "time",
+    "rt-multi-thread",
+    "signal",
+] }
+tokio-util = "0.7"
+log = "0.4"
+env_logger = { version = "0.11", default-features = false, features = [
+    "auto-color",
+    "humantime",
+] }
+rust_decimal = "1.27"
+anyhow = "1.0"
+ethers = { version = "2.0", default-features = false, features = ["abigen", "rustls", "ws"] }
