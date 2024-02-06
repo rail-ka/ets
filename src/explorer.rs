@@ -1,5 +1,9 @@
 use anyhow::{Context, Result};
 use ethers::prelude::*;
+use futures::{
+    future::{select, Either},
+    pin_mut,
+};
 use rust_decimal::Decimal;
 use tokio_util::sync::CancellationToken;
 
@@ -30,12 +34,29 @@ pub(crate) async fn explorer(min_value: Decimal, token: CancellationToken) -> Re
 
     info!("subscribed to new transactions");
 
-    while let Some(tx) = subscriber.next().await {
-        if token.is_cancelled() {
-            break;
+    let fut = async {
+        while let Some(tx) = subscriber.next().await {
+            if token.is_cancelled() {
+                break;
+            }
+            if let Some(tx) = provider.get_transaction(tx).await? {
+                transaction_handle(tx, min_value);
+            }
         }
-        if let Some(tx) = provider.get_transaction(tx).await? {
-            transaction_handle(tx, min_value);
+
+        Ok(()) as Result<()>
+    };
+    pin_mut!(fut);
+
+    let cancel_fut = token.cancelled();
+    pin_mut!(cancel_fut);
+
+    let f = select(cancel_fut, fut);
+
+    match f.await {
+        Either::Left(_) => {}
+        Either::Right(_) => {
+            debug!("all jobs completed");
         }
     }
 

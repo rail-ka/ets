@@ -2,10 +2,6 @@
 
 use anyhow::{anyhow, Result};
 use env_logger::{Builder as LogBuilder, Env};
-use futures::{
-    future::{self, Either},
-    pin_mut,
-};
 use rust_decimal::Decimal;
 use time::OffsetDateTime;
 use tokio::{
@@ -35,8 +31,6 @@ fn main() -> Result<()> {
         .ok_or_else(|| anyhow!("invalid argument"))?;
     let eth_min_value = Decimal::from_str(&arg)?;
 
-    info!("Command-line argument: {eth_min_value}");
-
     let rt = Builder::new_multi_thread()
         .enable_io()
         .enable_time()
@@ -47,28 +41,19 @@ fn main() -> Result<()> {
         let cancel_token = CancellationToken::new();
         let cloned_token = cancel_token.clone();
 
-        let exit_hanlde = task::spawn(async move {
-            tokio::signal::ctrl_c().await.unwrap();
-            cloned_token.cancel();
-        });
-
-        let fut = explorer::explorer(eth_min_value, cancel_token.clone());
-
-        pin_mut!(fut);
-        let f = future::select(exit_hanlde, fut);
-
-        match f.await {
-            Either::Left((err, _)) => {
-                if let Err(e) = err {
-                    error!("{e}");
+        task::spawn(async move {
+            match tokio::signal::ctrl_c().await {
+                Ok(_) => {
+                    info!("ctrl-c received, cancelling all jobs");
+                    cloned_token.cancel();
+                }
+                Err(err) => {
+                    error!("{err}");
                 }
             }
-            Either::Right(_) => {
-                debug!("all jobs completed");
-            }
-        }
+        });
 
-        cancel_token.drop_guard();
+        explorer::explorer(eth_min_value, cancel_token.clone()).await?;
 
         Ok(()) as Result<()>
     })
