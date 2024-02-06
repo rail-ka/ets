@@ -47,13 +47,10 @@ fn main() -> Result<()> {
         let cancel_token = CancellationToken::new();
         let cloned_token = cancel_token.clone();
 
-        let exit_hanlde = task::Builder::new()
-            .name("ctrl_c-watcher")
-            .spawn(async move {
-                tokio::signal::ctrl_c().await.unwrap();
-                cloned_token.cancel();
-            })
-            .unwrap();
+        let exit_hanlde = task::spawn(async move {
+            tokio::signal::ctrl_c().await.unwrap();
+            cloned_token.cancel();
+        });
 
         let fut = explorer::explorer(eth_min_value, cancel_token.clone());
 
